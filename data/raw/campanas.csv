@@ -1,6 +1,0 @@
-cod_campana,nombre_campana,tipo_promocion,medio,fecha_inicio,fecha_fin,presupuesto
-CMP01,Liquidación de Verano,Descuento porcentual,Redes sociales,2026-01-10,2026-02-28,8000000
-CMP02,Vuelta a Clases,Descuento porcentual,Correo electrónico,2026-02-20,2026-03-20,5000000
-CMP03,Día de la Madre,Descuento porcentual,Redes sociales,2026-05-01,2026-05-10,6000000
-CMP04,CyberDay,Descuento porcentual,Sitio web,2026-06-01,2026-06-03,12000000
-CMP05,Fiestas Patrias,Descuento porcentual,Televisión,2026-09-01,2026-09-20,10000000
