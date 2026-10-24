@@ -195,14 +195,14 @@ APELLIDOS = ["González", "Muñoz", "Rojas", "Díaz", "Pérez", "Soto", "Contrer
 SEGMENTOS = ["Nuevo", "Frecuente", "VIP"]
 
 
-def generar_clientes(cantidad: int = 400) -> pd.DataFrame:
+def generar_clientes(cantidad: int = 400, primer_id: int = 1) -> pd.DataFrame:
     comunas = list(COMUNAS.keys())
     # Más clientes en la Región Metropolitana, como en la realidad
     pesos = np.array([3 if COMUNAS[c] == "Metropolitana" else 1 for c in comunas], dtype=float)
     pesos /= pesos.sum()
 
     filas = []
-    for i in range(1, cantidad + 1):
+    for i in range(primer_id, primer_id + cantidad):
         nombre = f"{rng.choice(NOMBRES)} {rng.choice(APELLIDOS)}"
         comuna = str(rng.choice(comunas, p=pesos))
         nacimiento = pd.Timestamp("1960-01-01") + pd.Timedelta(days=int(rng.integers(0, 365 * 45)))
@@ -394,6 +394,91 @@ def inyectar_errores_clientes(df: pd.DataFrame, registro: list) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------------
+# 10. Segundo lote: cambios en los maestros  (para probar SCD 1, 2 y 3)
+#     Cada cambio queda anotado para verificar después que el ETL lo aplicó bien.
+# ------------------------------------------------------------------
+def generar_cambios_clientes(clientes: pd.DataFrame, cambios: list) -> pd.DataFrame:
+    """Simula una nueva exportación del CRM, meses después, con clientes que cambiaron."""
+    nuevo = clientes.copy()
+    elegidos = rng.choice(nuevo.index, size=40, replace=False)
+    mudanzas, cambios_segmento, correcciones = elegidos[:15], elegidos[15:35], elegidos[35:]
+
+    # SCD 2: el cliente se cambió de comuna (y quizás de región)
+    for i in mudanzas:
+        antes = nuevo.loc[i, "comuna"]
+        despues = str(rng.choice([c for c in COMUNAS if c != antes]))
+        nuevo.loc[i, "comuna"] = despues
+        nuevo.loc[i, "region"] = COMUNAS[despues]
+        cambios.append(("clientes", nuevo.loc[i, "id_cliente"], "comuna", antes, despues, "SCD2"))
+
+    # SCD 2: el cliente cambió de segmento
+    siguiente = {"Nuevo": "Frecuente", "Frecuente": "VIP", "VIP": "Frecuente"}
+    for i in cambios_segmento:
+        antes = nuevo.loc[i, "segmento"]
+        nuevo.loc[i, "segmento"] = siguiente[antes]
+        cambios.append(("clientes", nuevo.loc[i, "id_cliente"], "segmento", antes, siguiente[antes], "SCD2"))
+
+    # SCD 1: la fecha de nacimiento estaba mal ingresada y se corrigió
+    for i in correcciones:
+        antes = nuevo.loc[i, "fecha_nacimiento"]
+        despues = (pd.Timestamp(antes) - pd.DateOffset(years=12)).strftime("%Y-%m-%d")
+        nuevo.loc[i, "fecha_nacimiento"] = despues
+        cambios.append(("clientes", nuevo.loc[i, "id_cliente"], "fecha_nacimiento", antes, despues, "SCD1"))
+
+    # Clientes que se registraron después del primer lote
+    nuevos = generar_clientes(cantidad=30, primer_id=len(clientes) + 1)
+    for _, fila in nuevos.iterrows():
+        cambios.append(("clientes", fila["id_cliente"], "(cliente nuevo)", "", "", "Inserción"))
+    return pd.concat([nuevo, nuevos], ignore_index=True)
+
+
+def generar_cambios_productos(productos: pd.DataFrame, cambios: list) -> pd.DataFrame:
+    """Simula una nueva exportación del maestro de productos con cambios."""
+    nuevo = productos.copy()
+
+    def fila_de(prefijo: str) -> int:
+        """Devuelve el índice del primer producto cuyo nombre empieza con 'prefijo'."""
+        return nuevo.index[nuevo["nombre_producto"].str.startswith(prefijo)][0]
+
+    # SCD 2: reclasificación de subcategoría
+    for prefijo, nueva_sub in [("Teclado inalámbrico", "Accesorios"),
+                               ("Bicicleta estática", "Máquinas de ejercicio")]:
+        i = fila_de(prefijo)
+        antes = nuevo.loc[i, "subcategoria"]
+        nuevo.loc[i, "subcategoria"] = nueva_sub
+        cambios.append(("productos", nuevo.loc[i, "cod_producto"], "subcategoria", antes, nueva_sub, "SCD2"))
+
+    # SCD 3: alza de precio de lista (entre 5% y 15%)
+    for i in rng.choice(nuevo.index, size=4, replace=False):
+        antes = int(nuevo.loc[i, "precio_lista"])
+        despues = precio_retail(antes * rng.uniform(1.05, 1.15))
+        nuevo.loc[i, "precio_lista"] = despues
+        nuevo.loc[i, "costo_unitario"] = int(round(nuevo.loc[i, "costo_unitario"] * despues / antes))
+        cambios.append(("productos", nuevo.loc[i, "cod_producto"], "precio_lista", antes, despues, "SCD3"))
+
+    # SCD 1: el producto se descontinúa (no interesa conservar el estado anterior)
+    i = fila_de("Cojín decorativo")
+    nuevo.loc[i, "estado"] = "Descontinuado"
+    cambios.append(("productos", nuevo.loc[i, "cod_producto"], "estado", "Activo", "Descontinuado", "SCD1"))
+
+    # Productos nuevos en el catálogo
+    agregados = []
+    for nombre, marca, sub, cat, precio in [
+        ("Smartwatch", "Samsung", "Wearables", "Tecnología", 189_990),
+        ("Tablet 10 pulgadas", "Lenovo", "Computación", "Tecnología", 229_990),
+        ("Cafetera express", "Oster", "Electrodomésticos", "Hogar", 119_990),
+    ]:
+        cod = f"PRD{len(nuevo) + len(agregados) + 1:04d}"
+        agregados.append({
+            "cod_producto": cod, "nombre_producto": f"{nombre} {marca}", "marca": marca,
+            "subcategoria": sub, "categoria": cat, "precio_lista": precio,
+            "costo_unitario": int(precio * 0.65), "estado": "Activo",
+        })
+        cambios.append(("productos", cod, "(producto nuevo)", "", "", "Inserción"))
+    return pd.concat([nuevo, pd.DataFrame(agregados)], ignore_index=True)
+
+
+# ------------------------------------------------------------------
 # Ejecución
 # ------------------------------------------------------------------
 if __name__ == "__main__":
@@ -426,3 +511,30 @@ if __name__ == "__main__":
     df_errores = pd.DataFrame(errores, columns=["archivo", "registro", "linea", "tipo_error"])
     df_errores.to_csv(RAIZ / "data" / "errores_inyectados_lote1.csv", index=False, encoding="utf-8")
     print(f"[OK] errores_inyectados_lote1.csv: {len(df_errores)} errores anotados")
+
+    # --- Lote 2: julio a septiembre de 2026, con cambios en los maestros ---
+    errores2, cambios = [], []
+    clientes2 = generar_cambios_clientes(clientes, cambios)
+    productos2 = generar_cambios_productos(productos, cambios)
+    activos2 = productos2[productos2["estado"] == "Activo"]      # lo descontinuado ya no se vende
+
+    ventas_tienda2 = generar_ventas_tienda(activos2, clientes2, sucursales, campanas,
+                                           "2026-07-01", "2026-09-30", cantidad_boletas=1500,
+                                           primer_folio=3001)
+    ventas_online2 = generar_ventas_online(activos2, clientes2, campanas,
+                                           "2026-07-01", "2026-09-30", cantidad_pedidos=600,
+                                           primer_pedido=1201)
+
+    guardar(clientes2, "clientes_lote2.csv")
+    guardar(productos2, "productos_lote2.csv")
+    guardar(inyectar_errores_tienda(ventas_tienda2, errores2), "ventas_tienda_lote2.csv")
+    guardar(inyectar_errores_online(ventas_online2, errores2), "ventas_online_lote2.csv")
+
+    df_errores2 = pd.DataFrame(errores2, columns=["archivo", "registro", "linea", "tipo_error"])
+    df_errores2.to_csv(RAIZ / "data" / "errores_inyectados_lote2.csv", index=False, encoding="utf-8")
+    print(f"[OK] errores_inyectados_lote2.csv: {len(df_errores2)} errores anotados")
+
+    df_cambios = pd.DataFrame(cambios, columns=["maestro", "registro", "atributo",
+                                                "valor_anterior", "valor_nuevo", "tratamiento"])
+    df_cambios.to_csv(RAIZ / "data" / "cambios_esperados_lote2.csv", index=False, encoding="utf-8")
+    print(f"[OK] cambios_esperados_lote2.csv: {len(df_cambios)} cambios anotados")
