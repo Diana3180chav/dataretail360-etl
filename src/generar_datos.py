@@ -178,11 +178,251 @@ def generar_campanas() -> pd.DataFrame:
 
 
 # ------------------------------------------------------------------
+# 6. Clientes  (origen: Marketing / CRM)
+# ------------------------------------------------------------------
+# comuna: región (también se usa para validar la jerarquía Región › Comuna)
+COMUNAS = {
+    "Santiago": "Metropolitana", "Maipú": "Metropolitana", "Puente Alto": "Metropolitana",
+    "Las Condes": "Metropolitana", "Ñuñoa": "Metropolitana", "La Florida": "Metropolitana",
+    "Providencia": "Metropolitana", "Viña del Mar": "Valparaíso", "Valparaíso": "Valparaíso",
+    "Antofagasta": "Antofagasta", "La Serena": "Coquimbo", "Coquimbo": "Coquimbo",
+    "Concepción": "Biobío", "Talcahuano": "Biobío", "Temuco": "La Araucanía",
+}
+NOMBRES = ["Camila", "Valentina", "Francisca", "Javiera", "Constanza", "Catalina", "Fernanda",
+           "Matías", "Benjamín", "Sebastián", "Nicolás", "Felipe", "Diego", "Tomás", "Joaquín"]
+APELLIDOS = ["González", "Muñoz", "Rojas", "Díaz", "Pérez", "Soto", "Contreras", "Silva",
+             "Martínez", "Sepúlveda", "Morales", "Rodríguez", "López", "Fuentes", "Torres"]
+SEGMENTOS = ["Nuevo", "Frecuente", "VIP"]
+
+
+def generar_clientes(cantidad: int = 400) -> pd.DataFrame:
+    comunas = list(COMUNAS.keys())
+    # Más clientes en la Región Metropolitana, como en la realidad
+    pesos = np.array([3 if COMUNAS[c] == "Metropolitana" else 1 for c in comunas], dtype=float)
+    pesos /= pesos.sum()
+
+    filas = []
+    for i in range(1, cantidad + 1):
+        nombre = f"{rng.choice(NOMBRES)} {rng.choice(APELLIDOS)}"
+        comuna = str(rng.choice(comunas, p=pesos))
+        nacimiento = pd.Timestamp("1960-01-01") + pd.Timedelta(days=int(rng.integers(0, 365 * 45)))
+        registro = pd.Timestamp("2020-01-01") + pd.Timedelta(days=int(rng.integers(0, 365 * 6)))
+        filas.append({
+            "id_cliente": f"CRM-{i:05d}",
+            "nombre": nombre,                                   # dato personal
+            "email": f"cliente{i:05d}@ejemplo.cl",              # dato personal (dominio ficticio)
+            "fecha_nacimiento": nacimiento.strftime("%Y-%m-%d"),
+            "comuna": comuna,
+            "region": COMUNAS[comuna],
+            "segmento": str(rng.choice(SEGMENTOS, p=[0.5, 0.35, 0.15])),
+            "fecha_registro": registro.strftime("%Y-%m-%d"),
+        })
+    return pd.DataFrame(filas)
+
+
+# ------------------------------------------------------------------
+# 7. Ventas de tiendas físicas  (origen: Comercial / sistema POS)
+#    Formato: fecha AAAA-MM-DD, descuento en pesos, una fila por línea de boleta
+# ------------------------------------------------------------------
+def campana_vigente(fecha: pd.Timestamp, campanas: pd.DataFrame):
+    """Devuelve el código de una campaña vigente en esa fecha, o None si no hay."""
+    dia = fecha.strftime("%Y-%m-%d")
+    # Las fechas en formato AAAA-MM-DD se pueden comparar directamente como texto
+    vigentes = campanas[(campanas["fecha_inicio"] <= dia) & (campanas["fecha_fin"] >= dia)]
+    if vigentes.empty:
+        return None
+    return str(vigentes.iloc[0]["cod_campana"])
+
+
+def generar_ventas_tienda(productos, clientes, sucursales, campanas,
+                          desde: str, hasta: str, cantidad_boletas: int,
+                          primer_folio: int = 1) -> pd.DataFrame:
+    fechas = pd.date_range(desde, hasta, freq="D")
+    # Los fines de semana se vende el doble
+    pesos_fecha = np.where(fechas.dayofweek >= 5, 2.0, 1.0)
+    pesos_fecha /= pesos_fecha.sum()
+
+    tiendas = sucursales[sucursales["tipo"] == "Física"]["cod_sucursal"].tolist()
+    filas = []
+    for k in range(cantidad_boletas):
+        folio = f"B{primer_folio + k:07d}"
+        fecha = fechas[rng.choice(len(fechas), p=pesos_fecha)]
+        sucursal = str(rng.choice(tiendas))
+        # 30% de las compras en tienda no identifica al cliente
+        cliente = str(rng.choice(clientes["id_cliente"])) if rng.random() > 0.30 else ""
+        campana = campana_vigente(fecha, campanas) if rng.random() < 0.5 else None
+        pct_desc = rng.choice([0.10, 0.15, 0.20, 0.30]) if campana else 0.0
+        # 1% de las boletas se anula; 2% corresponde a una nota de crédito (devolución)
+        azar = rng.random()
+        tipo_doc = "NOTA_CREDITO" if azar < 0.02 else "BOLETA"
+        estado = "ANULADA" if 0.02 <= azar < 0.03 else "EMITIDA"
+
+        n_lineas = int(rng.integers(1, 5))
+        posiciones = rng.choice(len(productos), size=n_lineas, replace=False)
+        for linea, pos in enumerate(posiciones, start=1):
+            prod = productos.iloc[pos]
+            cantidad = int(rng.choice([1, 1, 1, 2, 2, 3]))
+            precio = int(prod["precio_lista"])
+            filas.append({
+                "nro_boleta": folio,
+                "nro_linea": linea,
+                "fecha": fecha.strftime("%Y-%m-%d"),
+                "cod_sucursal": sucursal,
+                "id_cliente": cliente,
+                "cod_producto": prod["cod_producto"],
+                "cantidad": cantidad,
+                "precio_unitario": precio,
+                "descuento": int(round(precio * cantidad * pct_desc)),
+                "cod_campana": campana or "",
+                "tipo_documento": tipo_doc,
+                "estado": estado,
+            })
+    return pd.DataFrame(filas)
+
+
+# ------------------------------------------------------------------
+# 8. Ventas online  (origen: Canal digital / plataforma e-commerce)
+#    Formato DISTINTO a propósito: fecha DD/MM/AAAA HH:MM, descuento en %,
+#    nombres de columnas diferentes y estados propios del e-commerce.
+# ------------------------------------------------------------------
+def generar_ventas_online(productos, clientes, campanas,
+                          desde: str, hasta: str, cantidad_pedidos: int,
+                          primer_pedido: int = 1) -> pd.DataFrame:
+    fechas = pd.date_range(desde, hasta, freq="D")
+    filas = []
+    for k in range(cantidad_pedidos):
+        pedido = f"WEB-{primer_pedido + k:06d}"
+        fecha = fechas[int(rng.integers(len(fechas)))] + pd.Timedelta(minutes=int(rng.integers(0, 1440)))
+        canal = str(rng.choice(["WEB", "APP"], p=[0.6, 0.4]))
+        cliente = str(rng.choice(clientes["id_cliente"]))        # online siempre hay cliente
+        campana = campana_vigente(fecha.normalize(), campanas) if rng.random() < 0.6 else None
+        pct = int(rng.choice([10, 15, 20, 30])) if campana else 0
+        estado = str(rng.choice(["ENTREGADO", "CANCELADO", "DEVUELTO"], p=[0.94, 0.03, 0.03]))
+
+        n_items = int(rng.integers(1, 4))
+        posiciones = rng.choice(len(productos), size=n_items, replace=False)
+        for item, pos in enumerate(posiciones, start=1):
+            prod = productos.iloc[pos]
+            filas.append({
+                "id_pedido": pedido,
+                "item": item,
+                "fecha_pedido": fecha.strftime("%d/%m/%Y %H:%M"),
+                "canal": canal,
+                "cliente": cliente,
+                "sku": prod["cod_producto"],
+                "unidades": int(rng.choice([1, 1, 2])),
+                "precio": int(prod["precio_lista"]),
+                "dscto_pct": pct,
+                "campana": campana or "",
+                "estado_pedido": estado,
+            })
+    return pd.DataFrame(filas)
+
+
+# ------------------------------------------------------------------
+# 9. Inyección de errores de calidad (a propósito)
+#    Cada error queda anotado para comprobar después que el ETL lo detecta.
+# ------------------------------------------------------------------
+def inyectar_errores_tienda(df: pd.DataFrame, registro: list) -> pd.DataFrame:
+    df = df.copy()
+    # Tipo "Int64" (con I mayúscula): entero que admite valores vacíos
+    df["precio_unitario"] = df["precio_unitario"].astype("Int64")
+    idx = rng.choice(df.index, size=40, replace=False)
+    grupos = np.array_split(idx, 5)          # 5 tipos de error, 8 filas cada uno
+
+    for i in grupos[0]:
+        df.loc[i, "cantidad"] = -abs(int(df.loc[i, "cantidad"]))
+        registro.append(("ventas_tienda", df.loc[i, "nro_boleta"], int(df.loc[i, "nro_linea"]), "Cantidad negativa en boleta"))
+    for i in grupos[1]:
+        df.loc[i, "fecha"] = str(rng.choice(["2026-02-30", "2026-13-05", "2026-04-31"]))
+        registro.append(("ventas_tienda", df.loc[i, "nro_boleta"], int(df.loc[i, "nro_linea"]), "Fecha inválida"))
+    for i in grupos[2]:
+        df.loc[i, "cod_producto"] = "PRD9999"
+        registro.append(("ventas_tienda", df.loc[i, "nro_boleta"], int(df.loc[i, "nro_linea"]), "Producto inexistente"))
+    for i in grupos[3]:
+        df.loc[i, "precio_unitario"] = pd.NA
+        registro.append(("ventas_tienda", df.loc[i, "nro_boleta"], int(df.loc[i, "nro_linea"]), "Precio vacío"))
+    # Filas duplicadas exactas (el POS envió dos veces la misma línea)
+    duplicadas = df.loc[grupos[4]]
+    for _, fila in duplicadas.iterrows():
+        registro.append(("ventas_tienda", fila["nro_boleta"], int(fila["nro_linea"]), "Línea duplicada"))
+    df = pd.concat([df, duplicadas]).sort_values(["nro_boleta", "nro_linea"]).reset_index(drop=True)
+    return df
+
+
+def inyectar_errores_online(df: pd.DataFrame, registro: list) -> pd.DataFrame:
+    df = df.copy()
+    idx = rng.choice(df.index, size=15, replace=False)
+    grupos = np.array_split(idx, 3)
+
+    for i in grupos[0]:
+        df.loc[i, "cliente"] = "CRM-99999"
+        registro.append(("ventas_online", df.loc[i, "id_pedido"], int(df.loc[i, "item"]), "Cliente inexistente"))
+    for i in grupos[1]:
+        df.loc[i, "unidades"] = 0
+        registro.append(("ventas_online", df.loc[i, "id_pedido"], int(df.loc[i, "item"]), "Unidades en cero"))
+    duplicadas = df.loc[grupos[2]]
+    for _, fila in duplicadas.iterrows():
+        registro.append(("ventas_online", fila["id_pedido"], int(fila["item"]), "Línea duplicada"))
+    df = pd.concat([df, duplicadas]).sort_values(["id_pedido", "item"]).reset_index(drop=True)
+    return df
+
+
+def inyectar_errores_clientes(df: pd.DataFrame, registro: list) -> pd.DataFrame:
+    df = df.copy()
+    idx = rng.choice(df.index, size=20, replace=False)
+    grupos = np.array_split(idx, 4)
+
+    # Comuna escrita de forma inconsistente (minúsculas, sin tildes, espacios)
+    for i in grupos[0]:
+        df.loc[i, "comuna"] = f"  {df.loc[i, 'comuna'].lower().replace('ñ', 'n').replace('ú', 'u')} "
+        registro.append(("clientes", df.loc[i, "id_cliente"], 0, "Comuna con formato inconsistente"))
+    # Comuna asignada a una región que no le corresponde (rompe la jerarquía)
+    for i in grupos[1]:
+        df.loc[i, "region"] = "Valparaíso" if df.loc[i, "region"] != "Valparaíso" else "Biobío"
+        registro.append(("clientes", df.loc[i, "id_cliente"], 0, "Región no coincide con la comuna"))
+    # Fecha de nacimiento faltante
+    for i in grupos[2]:
+        df.loc[i, "fecha_nacimiento"] = ""
+        registro.append(("clientes", df.loc[i, "id_cliente"], 0, "Fecha de nacimiento vacía"))
+    # Clientes duplicados (el CRM exportó dos veces el mismo registro)
+    duplicados = df.loc[grupos[3]]
+    for _, fila in duplicados.iterrows():
+        registro.append(("clientes", fila["id_cliente"], 0, "Cliente duplicado"))
+    df = pd.concat([df, duplicados]).sort_values("id_cliente").reset_index(drop=True)
+    return df
+
+
+# ------------------------------------------------------------------
 # Ejecución
 # ------------------------------------------------------------------
 if __name__ == "__main__":
     print(f"Generando datos de origen en: {CARPETA_RAW}")
-    guardar(generar_canales(), "canales.csv")
-    guardar(generar_sucursales(), "sucursales.csv")
-    guardar(generar_productos(), "productos.csv")
-    guardar(generar_campanas(), "campanas.csv")
+
+    canales = generar_canales()
+    sucursales = generar_sucursales()
+    productos = generar_productos()
+    campanas = generar_campanas()
+    clientes = generar_clientes()
+
+    guardar(canales, "canales.csv")
+    guardar(sucursales, "sucursales.csv")
+    guardar(productos, "productos.csv")
+    guardar(campanas, "campanas.csv")
+
+    # --- Lote 1: enero a junio de 2026 ---
+    errores = []
+    ventas_tienda = generar_ventas_tienda(productos, clientes, sucursales, campanas,
+                                          "2026-01-01", "2026-06-30", cantidad_boletas=3000)
+    ventas_online = generar_ventas_online(productos, clientes, campanas,
+                                          "2026-01-01", "2026-06-30", cantidad_pedidos=1200)
+
+    guardar(inyectar_errores_clientes(clientes, errores), "clientes.csv")
+    guardar(inyectar_errores_tienda(ventas_tienda, errores), "ventas_tienda_lote1.csv")
+    guardar(inyectar_errores_online(ventas_online, errores), "ventas_online_lote1.csv")
+
+    # Registro de errores inyectados: queda FUERA de data/raw porque el ETL no debe verlo.
+    # Sirve para comprobar en el informe que el ETL detectó todos los errores.
+    df_errores = pd.DataFrame(errores, columns=["archivo", "registro", "linea", "tipo_error"])
+    df_errores.to_csv(RAIZ / "data" / "errores_inyectados_lote1.csv", index=False, encoding="utf-8")
+    print(f"[OK] errores_inyectados_lote1.csv: {len(df_errores)} errores anotados")

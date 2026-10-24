@@ -1,0 +1,76 @@
+archivo,registro,linea,tipo_error
+clientes,CRM-00221,0,Comuna con formato inconsistente
+clientes,CRM-00231,0,Comuna con formato inconsistente
+clientes,CRM-00397,0,Comuna con formato inconsistente
+clientes,CRM-00203,0,Comuna con formato inconsistente
+clientes,CRM-00032,0,Comuna con formato inconsistente
+clientes,CRM-00248,0,Región no coincide con la comuna
+clientes,CRM-00312,0,Región no coincide con la comuna
+clientes,CRM-00157,0,Región no coincide con la comuna
+clientes,CRM-00207,0,Región no coincide con la comuna
+clientes,CRM-00187,0,Región no coincide con la comuna
+clientes,CRM-00067,0,Fecha de nacimiento vacía
+clientes,CRM-00169,0,Fecha de nacimiento vacía
+clientes,CRM-00091,0,Fecha de nacimiento vacía
+clientes,CRM-00261,0,Fecha de nacimiento vacía
+clientes,CRM-00179,0,Fecha de nacimiento vacía
+clientes,CRM-00106,0,Cliente duplicado
+clientes,CRM-00099,0,Cliente duplicado
+clientes,CRM-00242,0,Cliente duplicado
+clientes,CRM-00078,0,Cliente duplicado
+clientes,CRM-00193,0,Cliente duplicado
+ventas_tienda,B0002225,1,Cantidad negativa en boleta
+ventas_tienda,B0001282,2,Cantidad negativa en boleta
+ventas_tienda,B0000981,2,Cantidad negativa en boleta
+ventas_tienda,B0002786,3,Cantidad negativa en boleta
+ventas_tienda,B0001016,4,Cantidad negativa en boleta
+ventas_tienda,B0001457,1,Cantidad negativa en boleta
+ventas_tienda,B0000010,1,Cantidad negativa en boleta
+ventas_tienda,B0001866,4,Cantidad negativa en boleta
+ventas_tienda,B0000656,1,Fecha inválida
+ventas_tienda,B0000808,2,Fecha inválida
+ventas_tienda,B0002674,1,Fecha inválida
+ventas_tienda,B0000274,2,Fecha inválida
+ventas_tienda,B0000095,1,Fecha inválida
+ventas_tienda,B0000045,3,Fecha inválida
+ventas_tienda,B0002134,1,Fecha inválida
+ventas_tienda,B0000577,3,Fecha inválida
+ventas_tienda,B0002991,3,Producto inexistente
+ventas_tienda,B0002544,3,Producto inexistente
+ventas_tienda,B0001378,2,Producto inexistente
+ventas_tienda,B0002033,4,Producto inexistente
+ventas_tienda,B0001263,1,Producto inexistente
+ventas_tienda,B0001121,3,Producto inexistente
+ventas_tienda,B0000049,1,Producto inexistente
+ventas_tienda,B0000463,2,Producto inexistente
+ventas_tienda,B0000074,1,Precio vacío
+ventas_tienda,B0001651,2,Precio vacío
+ventas_tienda,B0001870,1,Precio vacío
+ventas_tienda,B0001204,1,Precio vacío
+ventas_tienda,B0001781,1,Precio vacío
+ventas_tienda,B0002977,2,Precio vacío
+ventas_tienda,B0001472,3,Precio vacío
+ventas_tienda,B0000413,4,Precio vacío
+ventas_tienda,B0001178,1,Línea duplicada
+ventas_tienda,B0000011,3,Línea duplicada
+ventas_tienda,B0001192,2,Línea duplicada
+ventas_tienda,B0001587,1,Línea duplicada
+ventas_tienda,B0001829,1,Línea duplicada
+ventas_tienda,B0001606,4,Línea duplicada
+ventas_tienda,B0001907,2,Línea duplicada
+ventas_tienda,B0000908,1,Línea duplicada
+ventas_online,WEB-000482,1,Cliente inexistente
+ventas_online,WEB-000120,1,Cliente inexistente
+ventas_online,WEB-000698,1,Cliente inexistente
+ventas_online,WEB-000307,2,Cliente inexistente
+ventas_online,WEB-000286,1,Cliente inexistente
+ventas_online,WEB-000527,1,Unidades en cero
+ventas_online,WEB-000902,1,Unidades en cero
+ventas_online,WEB-000453,1,Unidades en cero
+ventas_online,WEB-000928,3,Unidades en cero
+ventas_online,WEB-001064,1,Unidades en cero
+ventas_online,WEB-000785,1,Línea duplicada
+ventas_online,WEB-000605,2,Línea duplicada
+ventas_online,WEB-001007,1,Línea duplicada
+ventas_online,WEB-000087,2,Línea duplicada
+ventas_online,WEB-000877,3,Línea duplicada
