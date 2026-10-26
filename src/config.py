@@ -37,3 +37,26 @@ FUENTES_POR_LOTE = {
         "ventas_online": "ventas_online_lote2.csv",
     },
 }
+
+# --- Parámetros de la capa Silver ---
+# Fecha de corte de cada lote: se usa para calcular la edad (y el tramo de edad)
+FECHA_CORTE_POR_LOTE = {1: "2026-06-30", 2: "2026-09-30"}
+
+# Tramos de edad: (edad mínima, edad máxima, etiqueta)
+TRAMOS_EDAD = [(18, 25, "18-25"), (26, 35, "26-35"), (36, 45, "36-45"),
+               (46, 55, "46-55"), (56, 65, "56-65"), (66, 120, "66+")]
+
+# Tabla de referencia geográfica oficial: comuna -> región.
+# Se usa para homologar comunas y validar la jerarquía Región > Comuna.
+REGION_POR_COMUNA = {
+    "Santiago": "Metropolitana", "Maipú": "Metropolitana", "Puente Alto": "Metropolitana",
+    "Las Condes": "Metropolitana", "Ñuñoa": "Metropolitana", "La Florida": "Metropolitana",
+    "Providencia": "Metropolitana", "Viña del Mar": "Valparaíso", "Valparaíso": "Valparaíso",
+    "Antofagasta": "Antofagasta", "La Serena": "Coquimbo", "Coquimbo": "Coquimbo",
+    "Concepción": "Biobío", "Talcahuano": "Biobío", "Temuco": "La Araucanía",
+}
+
+# Homologación de canales del e-commerce a los códigos del catálogo de canales
+CANAL_ONLINE = {"WEB": "CAN02", "APP": "CAN03"}
+CANAL_TIENDA = "CAN01"
+SUCURSAL_ONLINE = "WEB01"

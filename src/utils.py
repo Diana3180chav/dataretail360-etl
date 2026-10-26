@@ -65,3 +65,23 @@ def registrar_control(conexion: Connection, id_lote: int, capa: str, tabla: str,
         "fecha_ejecucion": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }])
     registro.to_sql("etl_control", conexion, if_exists="append", index=False)
+
+
+def cargar_por_lote(motor: Engine, df: pd.DataFrame, tabla: str, id_lote: int,
+                    capa: str, origen: str, logger: logging.Logger) -> int:
+    """
+    Carga un DataFrame en 'tabla' con recarga controlada:
+    borra las filas del mismo lote y luego inserta las nuevas, en una sola transacción.
+    """
+    with motor.begin() as conexion:
+        if tabla_existe(motor, tabla):
+            resultado = conexion.execute(
+                text(f"DELETE FROM {tabla} WHERE _id_lote = :lote"), {"lote": id_lote}
+            )
+            if resultado.rowcount > 0:
+                logger.warning(f"{tabla}: el lote {id_lote} ya existía; "
+                               f"se borraron {resultado.rowcount} filas antes de recargar")
+        df.to_sql(tabla, conexion, if_exists="append", index=False)
+        registrar_control(conexion, id_lote, capa, tabla, origen, len(df), "OK")
+    logger.info(f"Cargado {tabla}: {len(df)} filas")
+    return len(df)
