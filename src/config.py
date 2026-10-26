@@ -60,3 +60,18 @@ REGION_POR_COMUNA = {
 CANAL_ONLINE = {"WEB": "CAN02", "APP": "CAN03"}
 CANAL_TIENDA = "CAN01"
 SUCURSAL_ONLINE = "WEB01"
+
+# --- Parámetros de la capa Gold ---
+# Primer día de cada lote: desde esa fecha rigen las nuevas versiones SCD2
+FECHA_INICIO_POR_LOTE = {1: "2026-01-01", 2: "2026-07-01"}
+FECHA_INICIO_HISTORICA = "1900-01-01"    # vigencia inicial de la primera versión
+FECHA_FIN_ABIERTA = "9999-12-31"         # vigencia de la versión actual
+
+# Calendario de la dimensión Tiempo
+ANIO_CALENDARIO = 2026
+# Feriados nacionales de Chile 2026 (referencia para la dimensión Tiempo)
+FERIADOS = {
+    "2026-01-01", "2026-04-03", "2026-04-04", "2026-05-01", "2026-05-21",
+    "2026-06-21", "2026-06-29", "2026-07-16", "2026-08-15", "2026-09-18",
+    "2026-09-19", "2026-10-12", "2026-10-31", "2026-11-01", "2026-12-08", "2026-12-25",
+}
