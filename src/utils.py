@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 
 import pandas as pd
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Connection, Engine
 
 import config
@@ -44,7 +44,14 @@ def configurar_logging(nombre: str) -> logging.Logger:
 def obtener_motor() -> Engine:
     """Devuelve el 'motor' de SQLAlchemy conectado a la base SQLite del proyecto."""
     config.RUTA_BD.parent.mkdir(parents=True, exist_ok=True)
-    return create_engine(config.URL_BD)
+    motor = create_engine(config.URL_BD)
+
+    # SQLite no revisa las llaves foráneas a menos que se active en cada conexión
+    @event.listens_for(motor, "connect")
+    def activar_llaves_foraneas(conexion_dbapi, _):
+        conexion_dbapi.execute("PRAGMA foreign_keys = ON")
+
+    return motor
 
 
 def tabla_existe(motor: Engine, nombre_tabla: str) -> bool:
